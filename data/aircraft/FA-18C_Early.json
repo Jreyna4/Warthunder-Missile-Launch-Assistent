@@ -1,0 +1,19 @@
+{
+  "name": "F/A-18C Early",
+  "weapons": [
+    "AIM-9L",
+    "AIM-7F",
+    "AIM-7M",
+    "AIM-7P"
+  ],
+  "radar": {
+    "name": "AN/APG-65",
+    "search_range_km": null,
+    "track_range_km": null,
+    "can_guide_sarh": true,
+    "can_guide_arh": false
+  },
+  "max_speed_kmh": null,
+  "service_ceiling_m": null,
+  "notes": "Example card. Fill in the radar ranges, max speed and ceiling from the in-game stat card / wiki."
+}

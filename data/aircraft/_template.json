@@ -1,0 +1,16 @@
+{
+  "name": "Template - copy me",
+  "weapons": [
+    "Missile name as in the spreadsheet"
+  ],
+  "radar": {
+    "name": "",
+    "search_range_km": null,
+    "track_range_km": null,
+    "can_guide_sarh": true,
+    "can_guide_arh": true
+  },
+  "max_speed_kmh": null,
+  "service_ceiling_m": null,
+  "notes": "Files starting with _ are ignored. Copy this file, rename it, and fill it in (or use the GUI's 'New card')."
+}

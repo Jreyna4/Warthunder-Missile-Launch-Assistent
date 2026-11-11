@@ -1,0 +1,115 @@
+Name:	AAM-4
+Physical properties	
+Mass: [kg]	222
+Fuel mass of first stage: [kg]	47
+Fuel mass of second stage: [kg]	20
+Calibre: [mm]	203
+Length: [m]	3,667
+Distance between centre of mass and stabilisers:	0,5
+Engine properties 	
+Force of first stage: [N]	27025
+Burn time of first stage: [s]	4
+Raw acceleration at ignition: [m/s²]	121,73
+Specific impulse of first stage: [s]	234,45
+ΔV of first stage: [m/s]	547,15
+First stage start delay: [s]	0
+Force of second stage: [N]	9200
+Burn time of second stage: [s]	5,0
+Specific impulse of second stage: [s]	234,45
+ΔV of second stage: [m/s]	279,13
+Total ΔV: [m/s]	826,28
+Time from launch above which second stage starts: [s]	-
+ETA to impact below which second stage starts: [s]	-
+Minimum speed below which second stage starts: [m/s]	-
+Minimum closure rate below which second stage starts: [m/s]	-
+Fuze and warhead properties	
+Explosive mass: [kg of TNT equivalent]	16,1792
+Warhead:	SAPHE
+Penetration: [mm]	63,74
+Proximity fuze:	Yes
+Proximity fuze range: [m]	12
+Proximity fuze delay: [s]	1,8
+Impact fuze sensitivity: [mm]	0,05
+Impact fuze delay: [m]	0,4
+Guidance properties	
+Guidance type:	ARH + IOG + DL
+Band:	I
+Signal:	Pulse-Doppler
+Guidance start delay: [s]	0,3
+Guidance duration: [s]	100
+Seeker warm up time: [s]	0,3
+Seeker search duration: [s]	100
+Gimbal limit: [degrees]	55
+Track rate: [degrees/second]	60
+Uncaged seeker before launch:	Yes
+Maximum lock angle before launch: [degrees]	55
+Baseline lock range from all-aspect: [km]	16
+Range to target at which the seeker is turned on: [km]	20
+Maximum lock range (hard limit): [km]	25
+Gimbal memory: [s]	1
+Maximum break lock time: [s]	100
+Can lock after launch:	Yes
+Angular speed rejection threshold: [degrees/second]	30
+Acceleration rejection threshold range: [m/s^2]	-
+Inertial guidance drift speed: [m/s]	2
+Maximum IOG / GNSS guidance error: [m]	-
+Datalink:	Yes
+Can datalink reconnect:	No
+Sidelobe attenuation:	-30
+Transmitter power:	100
+Transmitter angle of half sensitivity:	15
+Transmitter sidelobe sensitivity:	-30
+Receiver angle of half sensitivity:	15
+Receiver sidelobe sensitivity:	-30
+Distance minimum value: [m]	300
+Distance maximum value: [km]	150
+Distance minimum signal gate: [m]	300
+Distance width: [m]	300
+Distance ref width: [m]	1200
+Distance gate search range: [m]	5000
+Distance gate alpha filter:	0,8
+Distance gate beta filter:	0,05
+Doppler speed minimum value: [m/s]	-3000
+Doppler speed maximum value: [m/s]	3000
+Doppler speed width: [m/s]	20
+Doppler speed ref width: [m/s]	80
+Doppler speed minimum signal gate: [m/s]	5
+Doppler speed gate search range: [m/s]	300
+Doppler speed gate alpha filter:	0,8
+Doppler speed gate beta filter:	0,05
+Proportional navigation multiplier: (affects how far ahead it attempts to lead)	6
+Base indicated air speed: [m/s]	1800
+PID proportional term:	0,002169
+PID integral term:	0,02284
+PID integral term limit:	1
+PID derivative term:	0,000072
+Flight characteristics	
+Drag coefficient multiplier (this is not the only value affecting drag, just because it's higher than another missile's doesn't mean it actually has higher drag!!):	1,3
+Simplified ballistic coefficient: (Higher the better, as drag is speed dependent, it won't be accurate in any scenario, but it won't be accurate in the same manner for all missiles. Gives a somwhat better number to compare how much missiles are affected by drag than the raw drag coeff value)	3683,89
+Maximum launch angle (horizontally / vertically): [degrees]	-
+Maximum fin angle of attack: [degrees]	25,95132119
+Maximum fin lateral acceleration:	32
+Wing area multiplier:	1,65
+Start speed: [m/s]	-
+Maximum speed: [m/s]	2000
+Maximum statcard (useless) speed: [Mach]	4
+Maximum statcard (useless) launch range: [km]	100
+Minimum range: [m]	30
+Flight range limit: [km]	100
+Maximum G-load: [G]	32
+Maximum statcard (useless) G-load: [G]	32
+Flight time when pull limit reaches x%: [s/%]	0,3 s / 0%
+Flight time when pull limit reaches x%: [s/%]	0,31 s / 100%
+Flight time when pull limit reaches x%: [s/%]	-
+ETA to impact when prop multiplier reaches x%: [s/%]	-
+ETA to impact when prop multiplier reaches x%: [s/%]	-
+ETA to impact when prop multiplier reaches x%: [s/%]	50 s / 50%
+ETA to impact when prop multiplier reaches x%: [s/%]	25 s / 80%
+ETA to impact when prop multiplier reaches x%: [s/%]	10 s / 100%
+Thrust vectoring:	No
+Thrust vectoring angle: [degrees]	-
+Loft:	Yes
+Loft angle: [degrees]	20
+Target elevation: [degrees]	-2,25
+Maximum target angular change:  [degrees/s]	0,95
+Additional Notes: 	
