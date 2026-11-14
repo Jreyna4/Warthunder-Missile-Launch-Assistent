@@ -17,8 +17,8 @@ from tkinter import filedialog, messagebox, ttk
 from . import library as lib
 from .advisor import Advice, ModelCache, advise
 from .aircraft import AircraftSpec, Radar
-from .missile import slug
-from .sheets import download_workbook, load_any, save_specs
+from .missile import names_match, slug
+from .sheets import dedupe, download_workbook, load_any, save_specs
 from .train import fingerprint, model_path, train_model
 from .units import ALT_UNITS, SPEED_UNITS, to_metres, to_tas_ms
 
@@ -86,19 +86,24 @@ class App(tk.Tk):
         self.aircraft_box = ttk.Combobox(setup, textvariable=self.aircraft_var, state="readonly", width=28)
         self.aircraft_box.grid(row=0, column=1, columnspan=2, sticky="ew", pady=2)
         self.aircraft_box.bind("<<ComboboxSelected>>", lambda e: self._refresh_missile_list())
-        ttk.Button(setup, text="New card", command=lambda: self.edit_aircraft(None)).grid(row=1, column=1, sticky="ew")
-        ttk.Button(setup, text="Edit card", command=self._edit_selected_aircraft).grid(row=1, column=2, sticky="ew")
+        card_btns = ttk.Frame(setup)
+        card_btns.grid(row=1, column=1, columnspan=2, sticky="ew")
+        for i, (label, cmd) in enumerate([("From wiki...", self.import_from_wiki),
+                                          ("New card", lambda: self.edit_aircraft(None)),
+                                          ("Edit card", self._edit_selected_aircraft)]):
+            card_btns.columnconfigure(i, weight=1)
+            ttk.Button(card_btns, text=label, command=cmd).grid(row=0, column=i, sticky="ew")
 
         ttk.Label(setup, text="Missile:").grid(row=2, column=0, sticky="w", pady=(8, 0))
         self.missile_var = tk.StringVar()
         self.missile_box = ttk.Combobox(setup, textvariable=self.missile_var, state="readonly", width=28)
         self.missile_box.grid(row=2, column=1, columnspan=2, sticky="ew", pady=(8, 2))
         self.missile_box.bind("<<ComboboxSelected>>", lambda e: self._on_missile())
-        self.only_carried = tk.BooleanVar(value=True)
-        ttk.Checkbutton(setup, text="Only missiles on the aircraft card", variable=self.only_carried,
+        self.show_all = tk.BooleanVar(value=False)
+        ttk.Checkbutton(setup, text="Show all missiles (if one is missing)", variable=self.show_all,
                         command=self._refresh_missile_list).grid(row=3, column=1, columnspan=2, sticky="w")
 
-        self.missile_info = tk.Text(setup, width=44, height=7, wrap="word", font=("Consolas", 9),
+        self.missile_info = tk.Text(setup, width=44, height=9, wrap="word", font=("Consolas", 9),
                                     relief="flat", background=self.cget("background"))
         self.missile_info.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(6, 0))
         self.missile_info.configure(state="disabled")
@@ -174,23 +179,30 @@ class App(tk.Tk):
         self.aircraft_box["values"] = [NO_AIRCRAFT, *self.aircraft]
         if self.aircraft_var.get() not in self.aircraft:
             self.aircraft_var.set(next(iter(self.aircraft), NO_AIRCRAFT))
-        self._refresh_missile_list()
         self.status.config(text=f"Loaded {len(self.missiles)} missiles, {len(self.aircraft)} aircraft cards")
+        self._refresh_missile_list()
 
     def _selected_aircraft(self) -> AircraftSpec | None:
         return self.aircraft.get(self.aircraft_var.get())
 
     def _refresh_missile_list(self):
+        """Missiles on the aircraft card first; with "Show all" ticked, every imported missile."""
         ac = self._selected_aircraft()
-        names = list(self.missiles)
-        if ac and self.only_carried.get() and ac.weapons:
-            carried = [n for n in names if ac.carries(n)]
-            if carried:
-                names = carried
+        all_names = sorted(self.missiles, key=str.upper)
+        if ac and ac.weapons:
+            # Keep the card's order (as listed on the wiki), then any extra versions.
+            carried = []
+            for w in ac.weapons:
+                carried += [n for n in all_names if names_match(w, n) and n not in carried]
+            names = carried + [n for n in all_names if n not in carried] if self.show_all.get() else carried
+            missing = ac.missing_weapons(all_names)
+            if missing:
+                self.status.config(text=f"Not in the imported spreadsheet: {', '.join(missing)}. "
+                                        "Tick 'Show all missiles' to pick another version.")
             else:
-                self.status.config(text=f"No imported missile matches {ac.name}'s weapons "
-                                        f"({', '.join(ac.weapons)}). Import the spreadsheet or untick the filter.")
-                names = []
+                self.status.config(text=f"{ac.name}: {len(carried)} air-to-air missiles")
+        else:
+            names = all_names
         self.missile_box["values"] = names
         if self.missile_var.get() not in names:
             self.missile_var.set(names[0] if names else "")
@@ -200,7 +212,15 @@ class App(tk.Tk):
         m = self.missiles.get(self.missile_var.get())
         self.missile_info.configure(state="normal")
         self.missile_info.delete("1.0", "end")
-        self.missile_info.insert("1.0", m.summary() if m else "No missile selected.")
+        text = m.summary() if m else "No missile selected."
+        ac = self._selected_aircraft()
+        if m and ac:
+            d = ac.details_for(m.name)
+            keys = ("Guidance", "Lock range in rear-aspect", "Lock range in all-aspect", "Launch range")
+            bits = [f"{k} {d[k]}" for k in keys if d.get(k, "-") not in ("-", "")]
+            if bits:
+                text += "\nWiki: " + ", ".join(bits)
+        self.missile_info.insert("1.0", text)
         self.missile_info.configure(state="disabled")
         self._update_model_status()
 
@@ -360,28 +380,68 @@ class App(tk.Tk):
         if not path:
             return
         try:
-            specs = load_any(Path(path))
+            specs, report = dedupe(load_any(Path(path)))
             save_specs(specs, lib.MISSILE_DIR)
         except Exception as exc:
             messagebox.showerror("Import failed", str(exc))
             return
         self.reload_data()
-        messagebox.showinfo("Import", f"Imported {len(specs)} missiles.")
+        messagebox.showinfo("Import", _import_message(len(specs), report))
 
     def download_sheet(self):
         def work(progress):
             progress("Downloading spreadsheet ...", 0.3)
             download_workbook(lib.WORKBOOK_FILE)
             progress("Importing ...", 0.8)
-            specs = load_any(lib.WORKBOOK_FILE)
+            specs, report = dedupe(load_any(lib.WORKBOOK_FILE))
             save_specs(specs, lib.MISSILE_DIR)
-            return len(specs)
+            return len(specs), report
 
-        def done(n):
+        def done(result):
             self.reload_data()
-            messagebox.showinfo("Download", f"Imported {n} air-to-air missiles.")
+            messagebox.showinfo("Download", _import_message(*result))
 
         self._run("Downloading ...", work, done)
+
+    def import_from_wiki(self):
+        WikiDialog(self)
+
+    def run_wiki_import(self, source: str):
+        from .wiki import import_aircraft
+
+        def work(progress):
+            progress("Reading the wiki page ...", 0.4)
+            return import_aircraft(source, lib.AIRCRAFT_DIR)
+
+        def done(result):
+            card, _path, unit, merged = result
+            self.aircraft_var.set(card.name)
+            self.show_all.set(False)
+            self.reload_data()
+            all_names = list(self.missiles)
+            lines = [f"{'Updated' if merged else 'Saved'} the aircraft card '{card.name}'.", ""]
+            lines.append(f"Radar: {card.radar.name or 'none found'}")
+            if card.max_speed_kmh:
+                lines.append(f"Max speed: {card.max_speed_kmh:g} km/h at {unit.max_speed_alt_m or 0:g} m")
+            lines.append("")
+            lines.append("Air-to-air missiles:")
+            for w in card.weapons:
+                found = [n for n in all_names if names_match(w, n)]
+                lines.append(f"  {'✓' if found else '✗'} {w}" + (f"  ->  {', '.join(found)}" if found and
+                                                                  found != [w] else "") +
+                             ("" if found else "  (not in the imported spreadsheet)"))
+            if not card.weapons:
+                lines.append("  none found on the page")
+            if unit.has_radar and not card.radar.track_range_km:
+                lines += ["", "The wiki doesn't list radar ranges. Open the card now to add the radar "
+                              "lock/track range? (Makes SARH/ARH advice more accurate.)"]
+                if messagebox.askyesno("Aircraft imported", "\n".join(lines)):
+                    self.edit_aircraft(self.aircraft.get(card.name))
+            else:
+                messagebox.showinfo("Aircraft imported", "\n".join(lines))
+            self.status.config(text=f"Imported {card.name} from the wiki")
+
+        self._run("Reading the wiki page ...", work, done)
 
     def _edit_selected_aircraft(self):
         self.edit_aircraft(self._selected_aircraft())
@@ -441,7 +501,7 @@ class AircraftEditor(tk.Toplevel):
         self.listbox.grid(row=n + 3, column=0, columnspan=2, sticky="ew")
         for i, name in enumerate(missile_names):
             self.listbox.insert("end", name)
-            if ac.carries(name) and ac.weapons:
+            if ac.weapons and ac.carries(name):
                 self.listbox.selection_set(i)
         extra = [w for w in ac.weapons if not any(_same(w, m) for m in missile_names)]
         self.extra = tk.StringVar(value=", ".join(extra))
@@ -472,7 +532,9 @@ class AircraftEditor(tk.Toplevel):
                               radar=Radar(self.v["radar"].get().strip(), num("search"), num("track"),
                                           self.sarh.get(), self.arh.get()),
                               max_speed_kmh=num("maxspd"), service_ceiling_m=num("ceiling"),
-                              notes=self.notes.get("1.0", "end").strip())
+                              notes=self.notes.get("1.0", "end").strip(),
+                              wiki_url=self.original.wiki_url if self.original else "",
+                              weapon_details=dict(self.original.weapon_details) if self.original else {})
         except ValueError:
             messagebox.showerror("Aircraft card", "Ranges, speed and ceiling must be numbers.", parent=self)
             return
@@ -484,6 +546,60 @@ class AircraftEditor(tk.Toplevel):
         self.app.aircraft_var.set(name)
         self.app.reload_data()
         self.destroy()
+
+
+def _import_message(n: int, report: list[str]) -> str:
+    msg = f"Imported {n} air-to-air missiles."
+    if report:
+        msg += "\n\nNames that appeared twice:\n" + "\n".join(report[:15])
+        if len(report) > 15:
+            msg += f"\n... and {len(report) - 15} more"
+    return msg
+
+
+class WikiDialog(tk.Toplevel):
+    """Ask for a wiki link (or a saved .html page) to build an aircraft card from."""
+
+    def __init__(self, app: App):
+        super().__init__(app)
+        self.app = app
+        self.title("Aircraft card from the War Thunder wiki")
+        self.transient(app)
+        self.resizable(False, False)
+        frm = ttk.Frame(self, padding=12)
+        frm.pack(fill="both", expand=True)
+        ttk.Label(frm, text="Paste the aircraft's wiki link, e.g. https://wiki.warthunder.com/unit/su_30mkk\n"
+                            "(the unit name on its own, like su_30mkk, also works)").grid(
+            row=0, column=0, columnspan=3, sticky="w")
+        self.var = tk.StringVar(value="")
+        entry = ttk.Entry(frm, textvariable=self.var, width=62)
+        entry.grid(row=1, column=0, columnspan=3, sticky="ew", pady=8)
+        entry.focus_set()
+        try:  # pre-fill from the clipboard if it holds a wiki link
+            clip = self.clipboard_get().strip()
+            if "wiki.warthunder.com" in clip:
+                self.var.set(clip)
+        except tk.TclError:
+            pass
+        ttk.Button(frm, text="Open saved page (.html)...", command=self.pick_file).grid(row=2, column=0, sticky="w")
+        ttk.Button(frm, text="Cancel", command=self.destroy).grid(row=2, column=2, sticky="e")
+        ttk.Button(frm, text="Import", command=self.ok).grid(row=2, column=1, sticky="e", padx=6)
+        self.bind("<Return>", lambda e: self.ok())
+        self.bind("<Escape>", lambda e: self.destroy())
+
+    def pick_file(self):
+        path = filedialog.askopenfilename(parent=self, title="Saved wiki page",
+                                          filetypes=[("Web page", "*.html *.htm"), ("All files", "*.*")])
+        if path:
+            self.var.set(path)
+            self.ok()
+
+    def ok(self):
+        source = self.var.get().strip()
+        if not source:
+            return
+        self.destroy()
+        self.app.run_wiki_import(source)
 
 
 def _same(a: str, b: str) -> bool:

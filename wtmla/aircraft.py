@@ -17,7 +17,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from .missile import slug
+from .missile import names_match, slug
 
 
 @dataclass
@@ -37,6 +37,8 @@ class AircraftSpec:
     max_speed_kmh: Optional[float] = None
     service_ceiling_m: Optional[float] = None
     notes: str = ""
+    wiki_url: str = ""
+    weapon_details: dict = field(default_factory=dict)   # wiki popup info per missile
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -46,7 +48,8 @@ class AircraftSpec:
         radar = Radar(**{k: v for k, v in (d.get("radar") or {}).items() if k in Radar.__dataclass_fields__})
         return cls(name=d["name"], weapons=list(d.get("weapons") or []), radar=radar,
                    max_speed_kmh=d.get("max_speed_kmh"), service_ceiling_m=d.get("service_ceiling_m"),
-                   notes=d.get("notes") or "")
+                   notes=d.get("notes") or "", wiki_url=d.get("wiki_url") or "",
+                   weapon_details=dict(d.get("weapon_details") or {}))
 
     def save(self, folder: Path) -> Path:
         folder = Path(folder)
@@ -60,9 +63,15 @@ class AircraftSpec:
         return cls.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
 
     def carries(self, missile_name: str) -> bool:
-        key = _key(missile_name)
-        return any(_key(w) == key or key.startswith(_key(w)) or _key(w).startswith(key) for w in self.weapons)
+        return any(names_match(w, missile_name) for w in self.weapons)
 
+    def missing_weapons(self, missile_names) -> list[str]:
+        """Weapons on this card that match none of the imported missiles."""
+        names = list(missile_names)
+        return [w for w in self.weapons if not any(names_match(w, n) for n in names)]
 
-def _key(name: str) -> str:
-    return "".join(ch for ch in name.upper() if ch.isalnum())
+    def details_for(self, missile_name: str) -> dict:
+        for w, d in self.weapon_details.items():
+            if names_match(w, missile_name):
+                return d
+        return {}

@@ -3,6 +3,7 @@
     python -m wtmla                      open the GUI
     python -m wtmla download             download the spreadsheet and import every AAM
     python -m wtmla import FILE          import an .xlsx / .csv / pasted .txt export
+    python -m wtmla add-aircraft URL     aircraft card from a wiki page, e.g. .../unit/su_30mkk
     python -m wtmla list                 show missiles, aircraft and trained models
     python -m wtmla advise AAM-4 --speed 1100 --alt 9000 [--aircraft "F/A-18C Early"]
     python -m wtmla train AAM-4          train the neural network for one missile ("all" for every one)
@@ -16,7 +17,8 @@ from pathlib import Path
 
 from . import library as lib
 from .advisor import ModelCache, advise
-from .sheets import download_workbook, load_any, save_specs
+from .missile import names_match
+from .sheets import dedupe, download_workbook, load_any, save_specs
 from .train import model_path, train_model
 from .units import ALT_UNITS, SPEED_UNITS, to_metres, to_tas_ms
 
@@ -35,6 +37,9 @@ def cmd_import(args):
     if not specs:
         print("No missiles found. Is the first column the row labels with a 'Name:' row?")
         return 1
+    specs, dup_report = dedupe(specs)
+    for line in dup_report:
+        print(f"  note: {line}")
     paths = save_specs(specs, lib.MISSILE_DIR)
     for s, p in zip(specs, paths):
         print(f"  {s.name:28s} {s.category:6s} -> {p.relative_to(lib.ROOT)}")
@@ -65,6 +70,19 @@ def cmd_advise(args):
     print(adv.text())
 
 
+def cmd_add_aircraft(args):
+    from .wiki import import_aircraft
+    card, path, unit, merged = import_aircraft(args.source, lib.AIRCRAFT_DIR)
+    missiles = lib.load_missiles()
+    print(f"{'Updated' if merged else 'Saved'} aircraft card: {card.name} -> {path.relative_to(lib.ROOT)}")
+    print(f"  Radar: {card.radar.name or 'none'}")
+    for w in card.weapons:
+        found = [n for n in missiles if card.carries(n) and names_match(w, n)]
+        print(f"  {w:14s} {'-> ' + ', '.join(found) if found else 'NOT in the imported spreadsheet'}")
+    if unit.has_radar and not card.radar.track_range_km:
+        print("  Tip: the wiki has no radar ranges; add the lock range in the GUI with 'Edit card'.")
+
+
 def cmd_train(args):
     missiles = lib.load_missiles()
     targets = list(missiles.values()) if args.missile.lower() == "all" else [lib.find(args.missile, missiles)]
@@ -88,6 +106,10 @@ def main(argv=None):
     i.add_argument("file")
     i.add_argument("--tab", default=None, help="tab name for a .csv export, e.g. 'AAM (SARH)'")
     i.set_defaults(func=cmd_import)
+
+    w = sub.add_parser("add-aircraft", help="create an aircraft card from a War Thunder wiki page")
+    w.add_argument("source", help="wiki link, unit name (su_30mkk) or a saved .html page")
+    w.set_defaults(func=cmd_add_aircraft)
 
     sub.add_parser("list", help="list missiles, aircraft and trained models").set_defaults(func=cmd_list)
 

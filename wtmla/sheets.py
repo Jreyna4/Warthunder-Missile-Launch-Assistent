@@ -272,6 +272,39 @@ def download_workbook(dest: Path, sheet_id: str = DEFAULT_SHEET_ID, timeout: flo
     return dest
 
 
+def dedupe(specs: Iterable[MissileSpec]) -> tuple[list[MissileSpec], list[str]]:
+    """Keep missiles whose names clash (same name in two tabs, or names that only differ by
+    upper/lower case, which Windows treats as the same file name).
+    Identical duplicates are dropped; different ones get the tab name added."""
+    kept: dict[str, MissileSpec] = {}
+    out: list[MissileSpec] = []
+    report: list[str] = []
+
+    def values(m: MissileSpec) -> dict:
+        d = m.to_dict()
+        d.pop("source_tab", None)
+        d.pop("name", None)
+        return d
+
+    for spec in specs:
+        key = slug(spec.name).lower()
+        if key in kept:
+            if values(kept[key]) == values(spec):
+                report.append(f"{spec.name}: identical copy in '{spec.source_tab}', skipped")
+                continue
+            base = spec.name
+            spec.name = f"{base} [{spec.source_tab or 'copy'}]"
+            n = 2
+            while slug(spec.name).lower() in kept:
+                spec.name = f"{base} [{spec.source_tab or 'copy'} {n}]"
+                n += 1
+            report.append(f"{base}: second version kept as '{spec.name}'")
+            key = slug(spec.name).lower()
+        kept[key] = spec
+        out.append(spec)
+    return out, report
+
+
 def save_specs(specs: Iterable[MissileSpec], out_dir: Path) -> list[Path]:
     paths = []
     for spec in specs:

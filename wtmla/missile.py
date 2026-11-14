@@ -176,6 +176,24 @@ def classify_guidance(guidance_type: Optional[str], tab_name: Optional[str] = No
     return UNKNOWN
 
 
+def name_key(name: str) -> str:
+    """'AIM-7F Sparrow' -> 'AIM7FSPARROW' (case and punctuation ignored)."""
+    return "".join(ch for ch in name.upper() if ch.isalnum())
+
+
+def _prefix_keys(name: str) -> set:
+    words = name.split()
+    return {name_key(" ".join(words[:i])) for i in range(1, len(words) + 1)}
+
+
+def names_match(a: str, b: str) -> bool:
+    """Same missile? 'AIM-7F' = 'AIM-7F Sparrow', but 'R-27R' != 'R-27R1' and 'Super 530D' != 'Super 530F'."""
+    ka, kb = name_key(a), name_key(b)
+    if not ka or not kb:
+        return False
+    return ka == kb or ka in _prefix_keys(b) or kb in _prefix_keys(a)
+
+
 def slug(name: str) -> str:
     """File-system-safe version of a missile or aircraft name."""
     s = re.sub(r"[^A-Za-z0-9._+-]+", "_", name.strip())

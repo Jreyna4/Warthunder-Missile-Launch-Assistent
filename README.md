@@ -89,20 +89,47 @@ The repo ships only **AAM-4** as a sample. Import the full sheet in one of two w
 
 * **Automatic:** in the app, *Data → Download spreadsheet from Google Sheets*
   (or run `python -m wtmla download`). Every `AAM (...)` tab is imported.
-* **Manual:** open the sheet, *File → Download → Microsoft Excel (.xlsx)*, then
+* **Manual:** open the sheet, *File → Download → **Microsoft Excel (.xlsx)*** (this includes every tab;
+  CSV/TSV only export the tab you are looking at), then
   *Data → Import spreadsheet file* (or `python -m wtmla import "Guided weaponry data.xlsx"`).
   One tab exported as `.csv` works too.
 
 Missiles are saved as JSON in `data/missiles/`, one file per missile. You can read and edit them.
+If the same name appears twice in the sheet, identical copies are skipped. A different
+second version is kept with its tab name added, e.g. `AIM-9L [AAM (IR rear-aspect)]`.
 
 ## Aircraft cards
 
-`data/aircraft/FA-18C_Early.json` is an example. Create your own with the **New card**
-button in the GUI, or copy `data/aircraft/_template.json`. Fill in from the aircraft's
-in-game stat card / wiki page:
+An aircraft card lists the plane's air-to-air missiles and its radar. The easiest way
+to make one is from the **War Thunder wiki**:
 
-* `weapons`: the air-to-air missiles it carries, named as in the spreadsheet
-* `radar.track_range_km`: how far your radar can lock a fighter. This limits SARH/ARH advice
+1. Open the aircraft's wiki page, e.g. `https://wiki.warthunder.com/unit/su_30mkk`, and copy the link.
+2. In the app click **From wiki...**, paste the link (or just `su_30mkk`) and press **Import**.
+3. The app reads the page and saves the card with:
+   * name, max speed and its altitude, max altitude, Mach and G limits
+   * radar model (and whether it has search/track/TWS)
+   * every **air-to-air missile** from *List of available weapons*, with each missile's wiki
+     popup (guidance, lock ranges, launch range ...). Rockets, bombs and anti-radiation
+     missiles are skipped.
+4. A summary shows ✓ for each missile found in your imported spreadsheet and ✗ for ones that aren't.
+5. The wiki doesn't list **radar ranges**, so the app offers to open the card so you can add
+   the radar's lock/track range. Re-importing the same aircraft later keeps the ranges you typed.
+
+Command line: `python -m wtmla add-aircraft https://wiki.warthunder.com/unit/su_30mkk`
+
+If the download is blocked, open the page in your browser, press **Ctrl+S**, save as
+*Webpage, HTML only*, then use **Open saved page (.html)...** in the same window.
+
+**Missile list:** the Missile dropdown shows only the selected aircraft's missiles, in wiki order.
+If a missile is missing (✗, or it has a different name in the spreadsheet), tick
+**Show all missiles**: the aircraft's missiles stay at the top, followed by every imported missile.
+
+You can also make or change cards by hand with **New card** / **Edit card**, or by copying
+`data/aircraft/_template.json`:
+
+* `weapons`: the air-to-air missiles it carries. Names are matched loosely, so `AIM-7F`
+  matches `AIM-7F Sparrow` (but `R-27R` does not match `R-27R1`).
+* `radar.track_range_km`: how far your radar can lock a fighter. This limits SARH/ARH advice.
 * `radar.can_guide_sarh` / `radar.can_guide_arh`
 
 ## Use it
@@ -158,6 +185,7 @@ climbing/diving, seeker break-lock, multipath close to the ground.
 ```
 wtmla/
   sheets.py      spreadsheet parser + downloader
+  wiki.py        aircraft card from a War Thunder wiki page
   missile.py     MissileSpec data model
   aircraft.py    aircraft cards
   atmosphere.py  standard atmosphere, IAS/TAS/Mach
